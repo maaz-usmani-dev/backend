@@ -1,7 +1,6 @@
 import { v2 as cloudinary } from "cloudinary"
 import fs from "fs"
 
-
 const uploadOnCloudinary = async (localFilePath) => {
     try {
         cloudinary.config({
