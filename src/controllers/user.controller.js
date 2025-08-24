@@ -75,7 +75,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
     // return res
     return res.status(201).json(
-        new ApiResponse(200, createdUser, "User Created Successfully")
+        new ApiResponse(201, createdUser, "User Created Successfully")
 
     )
 
@@ -87,7 +87,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     // validate username or email
     if (!(username || email))
-        throw new ApiError(500, "Username is required")
+        throw new ApiError(400, "Username or Email is required")
 
     // find user
     const user = await User.findOne({
