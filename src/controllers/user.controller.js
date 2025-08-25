@@ -6,20 +6,6 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 import { cookieOptions } from "../constants.js"
 
-// const generateTokens = async (user) => {
-//     try {
-//         const accessToken = user.generateAccessToken()
-//         const refreshToken = user.generateRefreshToken()
-
-//         user.refreshToken = refreshToken
-
-//         await user.save({ validateBeforeSave: false })
-//         return { accessToken, refreshToken }
-//     } catch (error) {
-//         throw new ApiError(500, "Failed to generate Tokens")
-//     }
-// }
-
 const registerUser = asyncHandler(async (req, res) => {
 
     // get userdata
@@ -31,18 +17,21 @@ const registerUser = asyncHandler(async (req, res) => {
     if ([username, email, fullname, password].some((field) => field?.trim() === "")) {
         throw new ApiError(400, "All Fields are required")
     }
-
     // check if already exists
 
     const existingUser = await User.findOne({
         $or: [{ username }, { email }]
     })
-
     // check files and avatar
-
+    if (!req.files) {
+        throw new ApiError(400, "No files uploaded or files are invalid");
+    }
     if (existingUser) throw new ApiError(409, "User with email or username already exists")
     const avatarLocalPath = req.files?.avatar[0]?.path
-    const coverImageLocal = req.files?.coverImage[0]?.path
+    let coverImageLocal;
+    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+        coverImageLocal = req.files.coverImage[0].path
+    }
     if (!avatarLocalPath) {
         throw new ApiError(400, "Avatar Local is required")
     }
@@ -50,7 +39,6 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const avatar = await uploadOnCloudinary(avatarLocalPath)
     const coverImage = await uploadOnCloudinary(coverImageLocal)
-
     // Check avatar
 
     if (!avatar) throw new ApiError(400, "Avatar Cloudinary is required")
@@ -82,6 +70,7 @@ const registerUser = asyncHandler(async (req, res) => {
     )
 
 
+
 })
 const loginUser = asyncHandler(async (req, res) => {
     // get data
@@ -100,7 +89,7 @@ const loginUser = asyncHandler(async (req, res) => {
     // check password
     const passwordCorrect = await user.isPasswordCorrect(password)
     if (!passwordCorrect) {
-        throw new ApiError(400, "Password is incorrect")
+        throw new ApiError(400, "Invalid credentials")
     }
     // generate access and refresh token
     const { accessToken, refreshToken } = await user.generateTokens()
