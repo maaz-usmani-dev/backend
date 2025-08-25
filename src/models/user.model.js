@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
         required: true,
         lowercase: true,
         trim: true,
+        match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address"]
     },
     fullname: {
         type: String,
@@ -54,7 +55,10 @@ userSchema.pre("save", async function (next) {  // Arrow fn is not used coz it d
 })
 
 userSchema.methods.isPasswordCorrect = async function (password) {
-    return await bcrypt.compare(password,this.password)
+    return await bcrypt.compare(password, this.password)
+}
+userSchema.methods.isTokenCorrect = async function (refreshToken) {
+    return await bcrypt.compare(refreshToken, this.refreshToken)
 }
 userSchema.methods.generateTokens = async function () {
     const accessToken = jwt.sign(
@@ -78,18 +82,19 @@ userSchema.methods.generateTokens = async function () {
             expiresIn: process.env.REFRESH_TOKEN_EXPIRY
         }
     )
-    this.refreshToken = refreshToken
+
+    this.refreshToken = await bcrypt.hash(refreshToken, 10)
     await this.save({ validateBeforeSave: false })
     return { accessToken, refreshToken }
 }
 // userSchema.methods.generateAccessToken = function () {
 //     return jwt.sign(
-        // {
-        //     _id: this._id,
-        //     email: this.email,
-        //     username: this.username,
-        //     fullname: this.fullname
-        // },
+// {
+//     _id: this._id,
+//     email: this.email,
+//     username: this.username,
+//     fullname: this.fullname
+// },
 //         process.env.ACCESS_TOKEN_SECRET,
 //         {
 //             expiresIn: process.env.ACCESS_TOKEN_EXPIRY
