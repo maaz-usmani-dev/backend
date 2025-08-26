@@ -54,11 +54,12 @@ const registerUser = asyncHandler(async (req, res) => {
     })
 
     // Check User
-
     if (!user) {
         throw new ApiError(500, "Something went wrong while registration");
     }
-
+    
+    user.password = undefined
+    user.refreshToken = undefined
     // return res
     return res.status(201).json(
         new ApiResponse(201, user, "User Created Successfully")
@@ -173,6 +174,9 @@ const changePassword = asyncHandler(async (req, res) => {
     const { oldPassword, newPassword } = req.body
     if (!oldPassword || !newPassword) {
         throw new ApiError(400, "Fields are required")
+    }
+    if (newPassword === oldPassword) {
+        throw new ApiError(400,"New password must not equal to old password")
     }
     const user = await User.findById(req.user?._id).select("+password")
     const passwordCorrect = await user.isPasswordCorrect(oldPassword)
