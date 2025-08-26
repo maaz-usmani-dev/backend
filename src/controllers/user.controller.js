@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/AsyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
 import { User } from "../models/user.model.js"
-import { uploadOnCloudinary } from "../utils/cloudinary.js"
+import { removeFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 import { cookieOptions } from "../constants.js"
@@ -22,11 +22,8 @@ const registerUser = asyncHandler(async (req, res) => {
     const existingUser = await User.findOne({
         $or: [{ username }, { email }]
     })
-    // check files and avatar
-    if (!req.files) {
-        throw new ApiError(400, "No files uploaded or files are invalid");
-    }
     if (existingUser) throw new ApiError(409, "User with email or username already exists")
+
     const avatarLocalPath = req.files?.avatar[0]?.path
     let coverImageLocal;
     if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
@@ -47,25 +44,24 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const user = await User.create({
         fullname,
-        avatar,
-        coverImage: coverImage || "",
+        avatar: avatar.secure_url,
+        avatarPublicId: avatar.public_id,
+        coverImage: coverImage.secure_url || "",
+        coverPublicId: coverImage.public_id,
         email,
         password,
         username: username.toLowerCase()
     })
 
-    // Check User and remove password and refresh token field from response
+    // Check User
 
-    const createdUser = await User.findById(user._id).select(
-        "-password -refreshToken"
-    )
-    if (!createdUser) {
+    if (!user) {
         throw new ApiError(500, "Something went wrong while registration");
     }
 
     // return res
     return res.status(201).json(
-        new ApiResponse(201, createdUser, "User Created Successfully")
+        new ApiResponse(201, user, "User Created Successfully")
 
     )
 
@@ -83,7 +79,7 @@ const loginUser = asyncHandler(async (req, res) => {
     // find user
     const user = await User.findOne({
         $or: [{ username }, { email }]
-    })
+    }).select("+password +refreshToken")
     if (!user)
         throw new ApiError(404, "User Does not exist")
     // check password
@@ -94,8 +90,8 @@ const loginUser = asyncHandler(async (req, res) => {
     // generate access and refresh token
     const { accessToken, refreshToken } = await user.generateTokens()
     // either one more db query or update the user
-
-    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+    user.password = undefined
+    user.refreshToken = undefined
     // send cookies
 
     return res
@@ -106,7 +102,7 @@ const loginUser = asyncHandler(async (req, res) => {
             new ApiResponse(
                 200,
                 {
-                    user: loggedInUser,
+                    user,
                     accessToken,
                     refreshToken
                 },
@@ -142,11 +138,11 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             throw new ApiError(401, "Unauthorized Access")
         }
         const decodedToken = jwt.verify(incomingToken, process.env.REFRESH_TOKEN_SECRET)
-        const user = await User.findById(decodedToken?._id)
+        const user = await User.findById(decodedToken?._id).select("+refreshToken")
         if (!user) {
             throw new ApiError(401, "Invalid Refresh Token")
         }
-        const tokenCorrect = await user?.isTokenCorrect(incomingToken)
+        const tokenCorrect = await user.isTokenCorrect(incomingToken)
         if (!tokenCorrect) {
             throw new ApiError(401, "Refresh Token is expired or used")
         }
@@ -178,7 +174,7 @@ const changePassword = asyncHandler(async (req, res) => {
     if (!oldPassword || !newPassword) {
         throw new ApiError(400, "Fields are required")
     }
-    const user = await User.findById(req.user?._id)
+    const user = await User.findById(req.user?._id).select("+password")
     const passwordCorrect = await user.isPasswordCorrect(oldPassword)
     if (!passwordCorrect) {
         throw new ApiError(400, "Old Password is invalid")
@@ -218,7 +214,7 @@ const editUserData = asyncHandler(async (req, res) => {
         {
             new: true
         }
-    ).select("-password")
+    )
     return res
         .status(200)
         .json(
@@ -234,17 +230,21 @@ const changeAvatar = asyncHandler(async (req, res) => {
     if (!avatar) {
         throw new ApiError(500, "Failed to upload avatar")
     }
+    if (req.user?.avatarPublicId) {
+        await removeFromCloudinary(req.user.avatarPublicId)
+    }
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                avatar: avatar
+                avatar: avatar.secure_url,
+                avatarPublicId: avatar.public_id
             }
         },
         {
             new: true
         }
-    ).select("-password")
+    )
     return res
         .status(200)
         .json(
@@ -256,26 +256,30 @@ const changeAvatar = asyncHandler(async (req, res) => {
         )
 
 })
-const changeCoverImage = asyncHandler(async (req,res)=>{
+const changeCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocal = req.file?.path
     if (!coverImageLocal) {
         throw new ApiError(400, "File is required")
     }
     const coverImage = await uploadOnCloudinary(coverImageLocal)
     if (!coverImage) {
-        throw new ApiError(500, "Failed to upload cover Image")
+        throw new ApiError(500, "Failed to upload avatar")
+    }
+    if (req.user?.coverPublicId) {
+        await removeFromCloudinary(req.user.coverPublicId)
     }
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                coverImage
+                coverImage: coverImage.secure_url,
+                coverPublicId: coverImage.public_id
             }
         },
         {
             new: true
         }
-    ).select("-password")
+    )
     return res
         .status(200)
         .json(

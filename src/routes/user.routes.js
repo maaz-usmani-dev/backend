@@ -20,8 +20,8 @@ router.route("/register").post(
 )
 router.route("/login").post(loginUser)
 // secured Routes
-router.route("/logout").get(verifyJWT, logoutUser)
-router.route("/refresh-token").get(refreshAccessToken)
+router.route("/logout").post(verifyJWT, logoutUser)
+router.route("/refresh-token").post(refreshAccessToken)
 router.route("/change-password").patch(verifyJWT,changePassword)
 router.route("/current-user").get(verifyJWT,getCurrentUser)
 router.route("/update-info").patch(verifyJWT,editUserData)
