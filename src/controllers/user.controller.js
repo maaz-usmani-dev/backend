@@ -79,7 +79,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     // find user
     const user = await User.findOne({
-        $or: [{ username }, { email }]
+        $or: [{ username: username?.toLowerCase() }, { email }]
     }).select("+password +refreshToken")
     if (!user)
         throw new ApiError(404, "User Does not exist")
@@ -420,6 +420,41 @@ const getWatchHistory = asyncHandler(async (req, res) => {
             )
         )
 })
+const getChannelVideos = asyncHandler(async (req, res) => {
+    const { username } = req.params
+    if (!username) {
+        throw new ApiError(400, "Bad Request")
+    }
+    const videos = await User.aggregate([
+        {
+            $match: {
+                username: username?.toLowerCase(),
+            },
+        },
+        {
+            $lookup: {
+                from: "videos",
+                foreignField: "owner",
+                localField: "_id",
+                as: "channelVideos",
+            },
+        },
+        {
+            $project: {
+                channelVideos: 1
+            }
+        }
+    ])
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            videos,
+            "Videos fetched successfully"
+        )
+    )
+})
 export {
     registerUser,
     loginUser,
@@ -431,5 +466,6 @@ export {
     changeAvatar,
     changeCoverImage,
     getUserProfileData,
-    getWatchHistory
+    getWatchHistory,
+    getChannelVideos
 }
