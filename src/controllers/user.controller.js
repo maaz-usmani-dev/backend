@@ -6,6 +6,7 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 import { cookieOptions } from "../constants.js"
 import mongoose from "mongoose"
+import { getPublicId } from "../utils/getPublic_id.js"
 
 const registerUser = asyncHandler(async (req, res) => {
 
@@ -21,7 +22,7 @@ const registerUser = asyncHandler(async (req, res) => {
     // check if already exists
 
     const existingUser = await User.findOne({
-        $or: [{ username }, { email }]
+        $or: [{ username: username.toLowerCase() }, { email }]
     })
     if (existingUser) throw new ApiError(409, "User with email or username already exists")
 
@@ -45,10 +46,8 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const user = await User.create({
         fullname,
-        avatar: avatar.secure_url,
-        avatarPublicId: avatar.public_id,
-        coverImage: coverImage.secure_url || "",
-        coverPublicId: coverImage.public_id,
+        avatar: avatar,
+        coverImage: coverImage || "",
         email,
         password,
         username: username.toLowerCase()
@@ -58,12 +57,12 @@ const registerUser = asyncHandler(async (req, res) => {
     if (!user) {
         throw new ApiError(500, "Something went wrong while registration");
     }
-
-    user.password = undefined
-    user.refreshToken = undefined
+    const safeUser = user.toObject()
+    delete safeUser.password
+    delete safeUser.refreshToken
     // return res
     return res.status(201).json(
-        new ApiResponse(201, user, "User Created Successfully")
+        new ApiResponse(201, { user: safeUser }, "User Created Successfully")
 
     )
 
@@ -92,8 +91,9 @@ const loginUser = asyncHandler(async (req, res) => {
     // generate access and refresh token
     const { accessToken, refreshToken } = await user.generateTokens()
     // either one more db query or update the user
-    user.password = undefined
-    user.refreshToken = undefined
+    const safeUser = user.toObject()
+    delete safeUser.password
+    delete safeUser.refreshToken
     // send cookies
 
     return res
@@ -104,7 +104,7 @@ const loginUser = asyncHandler(async (req, res) => {
             new ApiResponse(
                 200,
                 {
-                    user,
+                    user: safeUser,
                     accessToken,
                     refreshToken
                 },
@@ -235,15 +235,15 @@ const changeAvatar = asyncHandler(async (req, res) => {
     if (!avatar) {
         throw new ApiError(500, "Failed to upload avatar")
     }
-    if (req.user?.avatarPublicId) {
-        await removeFromCloudinary(req.user.avatarPublicId)
+    const publicId = getPublicId(req.user?.avatar)
+    if (publicId) {
+        await removeFromCloudinary(publicId)
     }
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                avatar: avatar.secure_url,
-                avatarPublicId: avatar.public_id
+                avatar: avatar,
             }
         },
         {
@@ -270,15 +270,15 @@ const changeCoverImage = asyncHandler(async (req, res) => {
     if (!coverImage) {
         throw new ApiError(500, "Failed to upload avatar")
     }
-    if (req.user?.coverPublicId) {
-        await removeFromCloudinary(req.user.coverPublicId)
+    const publicId = getPublicId(req.user?.coverImage)
+    if (publicId) {
+        await removeFromCloudinary(publicId)
     }
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                coverImage: coverImage.secure_url,
-                coverPublicId: coverImage.public_id
+                coverImage: coverImage
             }
         },
         {
@@ -399,8 +399,8 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 
                     },
                     {
-                        $addFields:{
-                            owner:{
+                        $addFields: {
+                            owner: {
                                 $first: "$owner"
                             }
                         }
@@ -411,14 +411,14 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     ])
     const history = user[0]?.watchHistory || [];
     return res
-    .status(200)
-    .json(
-        new ApiResponse(
-            200,
-            history,
-            "Watch History fetched successfully"
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                history,
+                "Watch History fetched successfully"
+            )
         )
-    )
 })
 export {
     registerUser,
