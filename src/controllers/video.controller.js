@@ -113,8 +113,38 @@ const addToWatchHistory = asyncHandler(async (userId, videoId) => {
     user.watchHistory.push(videoId)
     await user.save({ validateBeforeSave: false })
 })
+const editVideoInfo = asyncHandler(async (req, res) => {
+    const { title, description, duration, isPublished } = req.body
+    const { videoId } = req.params
+    const video = await Video.findById(videoId)
+    if (!video) {
+        throw new ApiError(404, "Video not found")
+    }
+    if (req.user?._id.toString() !== video.owner.toString()) {
+        throw new ApiError(403, "Unauthorized Access")
+    }
+    if ([title, description].some((field) => field?.trim() === "") || !duration || isPublished === undefined) {
+        throw new ApiError(400, "All fields are required")
+    }
+    video.title = title
+    video.description = description
+    video.duration = duration
+    video.isPublished = isPublished
+
+    await video.save({ validateBeforeSave: false })
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            video,
+            "Video Updated Successfully"
+        )
+    )
+})
 export {
     uploadNewVideo,
     getVideoDetails,
-    deleteVideo
+    deleteVideo,
+    editVideoInfo
 }
