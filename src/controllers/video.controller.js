@@ -115,8 +115,8 @@ const addToWatchHistory = asyncHandler(async (userId, videoId) => {
 })
 const editVideoInfo = asyncHandler(async (req, res) => {
     const { title, description, duration, isPublished } = req.body
-    const { videoId } = req.params
-    const video = await Video.findById(videoId)
+    const { id } = req.params
+    const video = await Video.findById(id)
     if (!video) {
         throw new ApiError(404, "Video not found")
     }
