@@ -88,13 +88,11 @@ const deleteVideo = asyncHandler(async (req, res) => {
     if (req.user?._id.toString() !== video.owner.toString()) {
         throw new ApiError(403, "Unauthorized Access")
     }
-    const videoPublicId = getPublicId(video.videoFile)
-    if (videoPublicId) {
-        await removeFromCloudinary(videoPublicId)
+    if (video.videoFile) {
+        await removeFromCloudinary(video.videoFile)
     }
-    const thumbnailPublicId = getPublicId(video.thumbnail)
-    if (thumbnailPublicId) {
-        await removeFromCloudinary(thumbnailPublicId)
+    if (video.thumbnail) {
+        await removeFromCloudinary(video.thumbnail)
     }
     await video.deleteOne()
     return res

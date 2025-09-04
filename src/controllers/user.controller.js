@@ -6,7 +6,6 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt from "jsonwebtoken"
 import { cookieOptions } from "../constants.js"
 import mongoose from "mongoose"
-import { getPublicId } from "../utils/getPublic_id.js"
 
 const registerUser = asyncHandler(async (req, res) => {
 
@@ -235,9 +234,8 @@ const changeAvatar = asyncHandler(async (req, res) => {
     if (!avatar) {
         throw new ApiError(500, "Failed to upload avatar")
     }
-    const publicId = getPublicId(req.user?.avatar)
-    if (publicId) {
-        await removeFromCloudinary(publicId)
+    if (req.user?.avatar) {
+        await removeFromCloudinary(req.user.avatar)
     }
     const user = await User.findByIdAndUpdate(
         req.user?._id,
@@ -270,9 +268,8 @@ const changeCoverImage = asyncHandler(async (req, res) => {
     if (!coverImage) {
         throw new ApiError(500, "Failed to upload avatar")
     }
-    const publicId = getPublicId(req.user?.coverImage)
-    if (publicId) {
-        await removeFromCloudinary(publicId)
+    if (req.user?.coverImage) {
+        await removeFromCloudinary(req.user?.coverImage)
     }
     const user = await User.findByIdAndUpdate(
         req.user?._id,
