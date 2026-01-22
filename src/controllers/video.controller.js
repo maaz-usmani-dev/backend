@@ -6,7 +6,6 @@ import {
   removeFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
-import { getPublicId } from "../utils/getPublic_id.js";
 import { User } from "../models/user.model.js";
 
 const uploadNewVideo = asyncHandler(async (req, res) => {
