@@ -1,5 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
-import fs from "fs";
+import fs from "fs/promises";
 import { getPublicId } from "./getPublic_id";
 
 cloudinary.config({
@@ -22,10 +22,10 @@ const uploadOnCloudinary = async (localFilePath) => {
     });
     // file has been uploaded successfull
     //console.log("file is uploaded on cloudinary ", response.url);
-    fs.unlinkSync(localFilePath);
+    await fs.unlink(localFilePath).catch(() => {});
     return response.secure_url;
   } catch (error) {
-    fs.unlinkSync(localFilePath); // remove the locally saved temporary file as the upload operation got failed
+    await fs.unlink(localFilePath).catch(() => {}); // remove the locally saved temporary file as the upload operation got failed
     return null;
   }
 };
